@@ -11,6 +11,7 @@ import sys
 import re
 from math import log
 from math import exp
+from random import sample
 
 MAX_ITERS = 100
 
@@ -39,9 +40,15 @@ def train_perceptron(data):
     w = [0.0] * numvars
     b = 0.0
 
-    #
-    # YOUR CODE HERE!
-    #
+    # do MAX_ITER epochs of training
+    for i in range(MAX_ITERS):
+        # train on shuffled data
+        for x, y in sample(data, len(data)):
+            a = sum([v * z for v,z in zip(w, x)]) + b
+            if y * a <= 0:
+                w = [v + y * z for v,z in zip(w, x)]
+                b = b + y
+            
 
     return (w, b)
 
@@ -51,11 +58,9 @@ def train_perceptron(data):
 def predict_perceptron(model, x):
     (w, b) = model
 
-    #
-    # YOUR CODE HERE!
-    #
+    a = sum([v * z for v,z in zip(w, x)]) + b
 
-    return 0.0
+    return a
 
 
 # Load train and test data.  Learn model.  Report accuracy.
