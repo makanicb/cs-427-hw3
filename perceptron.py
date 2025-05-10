@@ -11,7 +11,6 @@ import sys
 import re
 from math import log
 from math import exp
-from random import sample
 
 MAX_ITERS = 100
 
@@ -42,8 +41,8 @@ def train_perceptron(data):
 
     # do MAX_ITER epochs of training
     for i in range(MAX_ITERS):
-        # train on shuffled data
-        for x, y in sample(data, len(data)):
+        # train on data
+        for x, y in data:
             a = sum([v * z for v,z in zip(w, x)]) + b
             if y * a <= 0:
                 w = [v + y * z for v,z in zip(w, x)]
