@@ -24,9 +24,6 @@ def test_sigmoid():
     assert round(sigmoid_function(1), 3) == 0.731
     assert round(sigmoid_function(-1), 3) == 0.269
 
-    assert sigmoid_function(99999) > 0.9
-    assert sigmoid_function(-99999) < 0.1
-
 
 def test_sigmoid_stable():
     assert sigmoid_function_stable(0) == 0.5
@@ -140,6 +137,8 @@ def test_compute_gradient_of_weights():
     y = [1, 0]
     l2_reg_weight = 0.1
 
+    # Assertion fails following modification of gradient descent in which w
+    # no longer average the gradient over the number of examples
     assert(compute_gradient_of_weights(x, w, y_hat, y, l2_reg_weight) == [0.25, -0.25])
 
 
@@ -184,4 +183,8 @@ def test_get_labels_from_data():
 
 def test_convert_labels():
     labels = [-1, 1, 1, -1]
+    assert convert_labels(labels) == [0, 1, 1, 0]
+
+def test_convert_labels_same():
+    labels = [0, 1, 1, 0]
     assert convert_labels(labels) == [0, 1, 1, 0]

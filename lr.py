@@ -13,8 +13,10 @@ from math import log
 from math import exp
 from math import sqrt
 
-GRAD_THRESHOLD = 0.0001
+
 MAX_ITERS = 100
+MIN_ITERS = 10
+GRAD_THRESHOLD = 0.0001
 
 
 # Load data from a file
@@ -33,10 +35,15 @@ def read_data(filename):
     return (data, varnames)
 
 
+# Squashes input z to a value between 0 - 1
+# Throws MathOverflow exception with large values, use
+# sigmoid_function_stable instead
 def sigmoid_function(z):
     return 1 / (1 + exp(-z))
 
-# Found this at https://developer.ibm.com/articles/implementing-logistic-regression-from-scratch-in-python/
+
+# Found this at
+# https://developer.ibm.com/articles/implementing-logistic-regression-from-scratch-in-python/
 def sigmoid_function_stable(x):
     if x >= 0:
         z = exp(-x)
@@ -46,6 +53,7 @@ def sigmoid_function_stable(x):
         return z / (1 + z)
 
 
+# Returns normalized vector of input vector 'vec'
 def vec_norm(vec):
     magnitude = vec_mag(vec)
     if magnitude == 0:
@@ -53,18 +61,30 @@ def vec_norm(vec):
     return vec_scale(vec, 1 / magnitude)
 
 
+# Returns vector equal to input vector 'vec' multiplied by specified scalar
 def vec_scale(vec, scalar):
     return [i * scalar for i in vec]
 
 
+# Returns vector equal to vec_a + vec_b
 def vec_add(vec_a, vec_b):
     return [ai+bi for ai, bi in zip(vec_a, vec_b)]
 
 
+# Returns vector equal to vec_a - vec_b
 def vec_sub(vec_a, vec_b):
     return [ai-bi for ai, bi in zip(vec_a, vec_b)]
 
 
+# Returns dot product of vec_a and vec_b
+def dot(vec_a, vec_b):
+    sum = 0.0
+    for a, b in zip(vec_a, vec_b):
+        sum += a * b
+    return sum
+
+
+# Returns magnitude of input vector 'vec'
 def vec_mag(vec):
     dot_product = dot(vec, vec)
     return sqrt(dot_product) if dot_product > 0 else 0
@@ -86,7 +106,9 @@ def compute_gradient_of_weights(x, w, y_hat, y, l2_reg_weight):
         nabla = vec_add(nabla, scaled_input)
 
     # Average the gradient over the number of examples
-    nabla = vec_scale(nabla, 1 / num_examples)
+    # This line was identified as unnecessary by TA Chien
+    # Doesn't this make the learning rate dependent on the number of examples?
+    # nabla = vec_scale(nabla, 1 / num_examples)
 
     # Calculate and apply L2 regularizer penalty (keeps large weights in check)
     penalty = vec_scale(w, l2_reg_weight)
@@ -95,6 +117,8 @@ def compute_gradient_of_weights(x, w, y_hat, y, l2_reg_weight):
     return nabla
 
 
+# computes the gradient of the bias for prediction vector y_hat and label
+# vector y
 def compute_gradient_of_bias(y_hat, y):
     num_examples = len(y)
     nabla = 0
@@ -104,14 +128,18 @@ def compute_gradient_of_bias(y_hat, y):
     return nabla / num_examples
 
 
+# extracts examples from the specified data
 def get_examples_from_data(data):
     return [example for (example, label) in data]
 
 
+# extracts labels from the specified data
 def get_labels_from_data(data):
     return [label for (example, label) in data]
 
 
+# returns a list of predictions made by the specified model for the
+# specified examples
 def make_predictions(model, examples):
     return [predict_lr(model, example) for example in examples]
 
@@ -131,11 +159,11 @@ def train_lr(data, eta, l2_reg_weight):
     labels = get_labels_from_data(data)
 
     # Labels in the CSV are in {-1, +1}, but it is easier to calculate error
-    # when labels are in {0, 1}, since we can subtract label y from probability
+    # when labels are in {0, 1} since we can subtract label y from probability
     # p to get an error in [0,1]
     labels = convert_labels(labels)
 
-    for _ in range(MAX_ITERS):
+    for i in range(MAX_ITERS):
         model = (w, b)
         # compute predictions
         predictions = make_predictions(model, examples)
@@ -144,26 +172,18 @@ def train_lr(data, eta, l2_reg_weight):
         # compute gradient of bias
         nabla_b = compute_gradient_of_bias(predictions, labels)
         # update weights
-        # nabla_w = vec_scale(nabla_w, eta)
-        w = vec_sub(w, vec_scale(nabla_w, eta))
+        nabla_w_eta = vec_scale(nabla_w, eta)
+        w = vec_sub(w, nabla_w_eta)
         # update bias
         b -= eta * nabla_b
-        # if gradient was small (<0.0001) then stop
 
-        # print(f"Iteration {_}: w = {w}, b = {b}, |∇w| = {vec_mag(nabla_w):.6f}")
-        # breaks on first update of AND, where xi = [0,0], y= -1
-        if (_ > 10) and (vec_mag(nabla_w) < GRAD_THRESHOLD):
-            # print(f"\nGradient < {GRAD_THRESHOLD}")
+        # if gradient was below threshold then stop.
+        # breaks on first update of AND, where xi = [0,0], y = -1 which finds a
+        # gradient of 0, so we specify a minimum number of iterations.
+        if (i > MIN_ITERS) and (vec_mag(nabla_w) < GRAD_THRESHOLD):
             break
 
     return (w, b)
-
-
-def dot(vec_a, vec_b):
-    sum = 0.0
-    for a, b in zip(vec_a, vec_b):
-        sum += a * b
-    return sum
 
 
 # Predict the probability of the positive label (y=+1) given the
