@@ -13,6 +13,7 @@ from math import log
 from math import exp
 from math import sqrt
 
+GRAD_THRESHOLD = 0.0001
 MAX_ITERS = 100
 
 
@@ -35,9 +36,14 @@ def read_data(filename):
 def sigmoid_function(z):
     return 1 / (1 + exp(-z))
 
-
-def log_loss(y, y_hat):
-    return log((1+ exp( -(y * y_hat)))) / log(2)
+# Found this at https://developer.ibm.com/articles/implementing-logistic-regression-from-scratch-in-python/
+def sigmoid_function_stable(x):
+    if x >= 0:
+        z = exp(-x)
+        return 1 / (1 + z)
+    else:
+        z = exp(x)
+        return z / (1 + z)
 
 
 def vec_norm(vec):
@@ -52,28 +58,40 @@ def vec_scale(vec, scalar):
 
 
 def vec_add(vec_a, vec_b):
-    return [a+b for a, b in zip(vec_a, vec_b)]
+    return [ai+bi for ai, bi in zip(vec_a, vec_b)]
 
 
 def vec_sub(vec_a, vec_b):
-    return [a-b for a, b in zip(vec_a, vec_b)]
+    return [ai-bi for ai, bi in zip(vec_a, vec_b)]
 
 
 def vec_mag(vec):
-    return sqrt(dot(vec, vec))
+    dot_product = dot(vec, vec)
+    return sqrt(dot_product) if dot_product > 0 else 0
 
 
+# Computes the gradient vector for weights
+#   i.e. the derivative of loss_func(prediction_error)
 def compute_gradient_of_weights(x, w, y_hat, y, l2_reg_weight):
-    num_examples = len(x)
-    nabla = [0] * len(w)
+    num_examples = len(x)   # Find number of examples to iterate over
+    nabla = [0] * len(w)    # Gradient vector, one for each weight
+
+    # Compute gradient for every example
     for i in range(num_examples):
+        # Compute prediction error
         error = y_hat[i] - y[i]
+        # Scale error by example vector
         scaled_input = vec_scale(x[i], error)
+        # Add gradient for this example
         nabla = vec_add(nabla, scaled_input)
 
+    # Average the gradient over the number of examples
     nabla = vec_scale(nabla, 1 / num_examples)
+
+    # Calculate and apply L2 regularizer penalty (keeps large weights in check)
     penalty = vec_scale(w, l2_reg_weight)
     nabla = vec_add(nabla, penalty)
+
     return nabla
 
 
@@ -98,15 +116,26 @@ def make_predictions(model, examples):
     return [predict_lr(model, example) for example in examples]
 
 
+# Converts labels from {-1, +1} to {0, +1}
+def convert_labels(labels):
+    return [(label + 1) // 2 for label in labels]
+
+
 # Train a logistic regression model using batch gradient descent
 def train_lr(data, eta, l2_reg_weight):
     numvars = len(data[0][0])
     w = [0.0] * numvars
     b = 0.0
+
     examples = get_examples_from_data(data)
     labels = get_labels_from_data(data)
 
-    for iteration in range(MAX_ITERS):
+    # Labels in the CSV are in {-1, +1}, but it is easier to calculate error
+    # when labels are in {0, 1}, since we can subtract label y from probability
+    # p to get an error in [0,1]
+    labels = convert_labels(labels)
+
+    for _ in range(MAX_ITERS):
         model = (w, b)
         # compute predictions
         predictions = make_predictions(model, examples)
@@ -115,12 +144,17 @@ def train_lr(data, eta, l2_reg_weight):
         # compute gradient of bias
         nabla_b = compute_gradient_of_bias(predictions, labels)
         # update weights
-        nabla_w = vec_scale(nabla_w, eta)
-        w = vec_sub(w, nabla_w)
+        # nabla_w = vec_scale(nabla_w, eta)
+        w = vec_sub(w, vec_scale(nabla_w, eta))
         # update bias
         b -= eta * nabla_b
         # if gradient was small (<0.0001) then stop
-        if vec_mag(nabla_w) < 0.0001: break
+
+        # print(f"Iteration {_}: w = {w}, b = {b}, |∇w| = {vec_mag(nabla_w):.6f}")
+        # breaks on first update of AND, where xi = [0,0], y= -1
+        if (_ > 10) and (vec_mag(nabla_w) < GRAD_THRESHOLD):
+            # print(f"\nGradient < {GRAD_THRESHOLD}")
+            break
 
     return (w, b)
 
@@ -137,8 +171,7 @@ def dot(vec_a, vec_b):
 def predict_lr(model, x):
     (w, b) = model
     z = dot(x, w) + b
-    return sigmoid_function(z)
-    # return 0.5 # This is a random probability, fix this according to your solution
+    return sigmoid_function_stable(z)
 
 
 # Load train and test data.  Learn model.  Report accuracy.
